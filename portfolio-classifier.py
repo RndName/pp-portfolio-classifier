@@ -17,7 +17,7 @@ import json
 # Modify this to the morningstar domain where your securities can be found
 # e.g. es for spain, de for germany, fr for france...
 # this is only used to find the corresponding secid from the ISIN
-DOMAIN = 'es'
+DOMAIN = 'de'
 
 
 
@@ -498,8 +498,12 @@ class SecurityHoldingReport:
                     else:
                         header = tr.td
                     if tr.text != '' and header.text not in non_categories:
-                        categories.append(header.text)                                     
-                        percentages.append(float(tr.select("td")[taxonomy['column']].text.replace(",",".")))
+                        categories.append(header.text)
+                        percentageString = tr.select("td")[taxonomy['column']].text.replace(",",".")
+                        if percentageString == "-":
+                            percentages.append(float(0))
+                        else:
+                            percentages.append(float(percentageString))
                 if len(taxonomy.get('map2',{})) != 0:
                     categories = [taxonomy['map2'][key] for key in categories]
         
@@ -566,11 +570,13 @@ class PortfolioPerformanceFile:
                             <children/>
                             <assignments>
                             {% for assignment in category["assignments"] %}
-                                <assignment>
-                                    <investmentVehicle class="security" reference="{{ assignment["security_xpath"] }}"/>
-                                    <weight>{{ assignment["weight"] }}</weight>
-                                    <rank>{{ assignment["rank"] }}</rank>
-                                </assignment>
+                                {% if assignment["weight"] > 0 %}
+                                    <assignment>
+                                        <investmentVehicle class="security" reference="{{ assignment["security_xpath"] }}"/>
+                                        <weight>{{ assignment["weight"] }}</weight>
+                                        <rank>{{ assignment["rank"] }}</rank>
+                                    </assignment>
+                                {% endif %}
                              {% endfor %}
                             </assignments>
                             <weight>0</weight>
