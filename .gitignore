@@ -1,2 +1,5 @@
 *.py[cod]
 *.sqlite
+venv
+isin2secid.json
+*.xml
