@@ -525,15 +525,15 @@ class PortfolioPerformanceCategory(NamedTuple):
 
 class PortfolioPerformanceFile:
 
-    def __init__ (self, filepath):
+    def __init__ (self, filepath, parse_all = False):
         self.filepath = filepath
         self.pp_tree = ET.parse(filepath)
         self.pp = self.pp_tree.getroot()
         self.securities = None
+        self.parse_all = parse_all
 
-    def get_security(self, security_xpath):
+    def get_security(self, security):
         """return a security object """
-        security =  self.pp.findall(security_xpath)[0]
         if security is not None:
             isin = security.find('isin') 
             if isin is not None:
@@ -559,7 +559,7 @@ class PortfolioPerformanceFile:
                 return f"../../../../../../../../securities/security[{idx + 1}]"
 
     def add_taxonomy (self, kind):
-        securities = self.get_securities()
+        securities = list(self.get_securities())
         taxonomy_tpl =  """
             <taxonomy>
                 <id>{{ outer_uuid }}</id>
@@ -655,18 +655,31 @@ class PortfolioPerformanceFile:
         if self.securities is None:
             self.securities = []
             sec_xpaths = []
-            for transaction in self.pp.findall('.//portfolio-transaction'): 
-                for child in transaction:
-                    if child.tag == "security":
-                        sec_xpaths.append('.//'+ child.attrib["reference"].split('/')[-1])
-    
-            for sec_xpath in list(set(sec_xpaths)):
-                security = self.get_security(sec_xpath)
-                if security is not None:
-                    security_h = security.load_holdings()
-                    if security_h.secid !='':
+            
+            if self.parse_all:
+                for security_element in self.pp.findall("./securities/security"):
+                    security = self.get_security(security_element)
+                    if security is not None:
                         self.securities.append(security)
-        return self.securities
+            
+            else:
+                for transaction in self.pp.findall('.//portfolio-transaction'): 
+                    for child in transaction:
+                        if child.tag == "security":
+                            sec_xpath = './/'+ child.attrib["reference"].split('/')[-1]
+                            if sec_xpath in sec_xpaths:
+                                continue
+                            sec_xpaths.append(sec_xpath)
+                            security = self.get_security(self.pp.findall(sec_xpath)[0])
+                            if security is not None:
+                                self.securities.append(security)
+    
+                
+            for security in self.securities: 
+                security_h = security.load_holdings()
+                if security_h.secid !='':
+                    yield security
+        yield from self.securities
 
 def print_class (grouped_holding):
     for key, value in sorted(grouped_holding.items(), reverse=True):
@@ -688,6 +701,9 @@ if __name__ == '__main__':
     parser.add_argument('-d', default='es',  dest='domain', type=str,
                         help='Morningstar domain from which to retrieve the secid (default: es)')
     
+    parser.add_argument('-a', '--all', dest='parse_all', action='store_true',
+                        help='Parse all securities. By default only securities from past transactions will be parsed.')
+    
     parser.add_argument('input_file', metavar='input_file', type=str,
                    help='path to unencrypted pp.xml file')
     
@@ -701,7 +717,7 @@ if __name__ == '__main__':
     else:
         DOMAIN = args.domain
         Isin2secid.load_cache()
-        pp_file = PortfolioPerformanceFile(args.input_file)
+        pp_file = PortfolioPerformanceFile(args.input_file, args.parse_all)
         for taxonomy in taxonomies:
             pp_file.add_taxonomy(taxonomy)
         Isin2secid.save_cache()

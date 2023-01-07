@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "portfolio-classifier.py",
             "console": "integratedTerminal",
-            "args": ["-d", "de", "input.xml", "output.xml"]
+            "args": ["-a", "-d", "de", "input.xml", "output.xml"]
         }
     ]
 }
